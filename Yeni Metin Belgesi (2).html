@@ -1,0 +1,685 @@
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modrinth Auto Checker</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #111318;
+    color: #f1f1f1;
+    font-family: Arial, sans-serif;
+    min-height: 100vh;
+}
+
+.container {
+    width: min(900px, 95%);
+    margin: 40px auto;
+}
+
+.header {
+    margin-bottom: 30px;
+}
+
+.header h1 {
+    font-size: 30px;
+    margin-bottom: 8px;
+}
+
+.header p {
+    color: #92959e;
+}
+
+.panel {
+    background: #1b1d23;
+    border: 1px solid #2b2e36;
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.status {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #777;
+    flex-shrink: 0;
+}
+
+.status-dot.active {
+    background: #45d483;
+    box-shadow: 0 0 12px #45d48355;
+}
+
+.status-dot.error {
+    background: #ff6565;
+}
+
+.status-title {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.status-description {
+    color: #9da0aa;
+    font-size: 14px;
+}
+
+button {
+    background: #39a86b;
+    color: white;
+    border: none;
+    padding: 12px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+button:hover {
+    background: #2f965c;
+}
+
+button:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+.notice {
+    border: 1px solid #48412a;
+    background: #28241b;
+    border-radius: 10px;
+    padding: 18px;
+    margin-top: 16px;
+}
+
+.notice h3 {
+    margin-top: 0;
+    color: #ffcf70;
+}
+
+.notice p {
+    color: #c3bba8;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.url-display {
+    word-break: break-all;
+    color: #8ec7ff;
+    margin-top: 10px;
+    font-size: 13px;
+}
+
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.results-header h2 {
+    margin: 0;
+}
+
+.results {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 12px;
+    margin-top: 18px;
+}
+
+.result-card {
+    background: #22252c;
+    border: 1px solid #333640;
+    border-radius: 10px;
+    padding: 16px;
+}
+
+.result-card h3 {
+    font-size: 15px;
+    margin: 0 0 12px;
+}
+
+.result-label {
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.supported {
+    color: #48d58a;
+}
+
+.unsupported {
+    color: #ff7070;
+}
+
+.unknown {
+    color: #ffcf70;
+}
+
+.small {
+    color: #888d98;
+    font-size: 12px;
+}
+
+.history-empty {
+    color: #888d98;
+    font-size: 14px;
+}
+
+.footer {
+    color: #666b76;
+    text-align: center;
+    margin-top: 30px;
+    font-size: 12px;
+}
+
+.loader {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid #777;
+    border-top-color: #45d483;
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+    vertical-align: middle;
+    margin-right: 7px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+@media(max-width:600px) {
+    .container {
+        margin: 20px auto;
+    }
+
+    .header h1 {
+        font-size: 24px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="header">
+        <h1>Modrinth Auto Checker</h1>
+        <p>Clipboard üzerinden otomatik mod uyumluluk kontrolü</p>
+    </div>
+
+    <div class="panel">
+
+        <div class="status">
+            <div id="statusDot" class="status-dot"></div>
+
+            <div>
+                <div id="statusTitle" class="status-title">
+                    Clipboard kontrol ediliyor
+                </div>
+
+                <div id="statusDescription" class="status-description">
+                    Clipboard erişimi henüz başlatılmadı.
+                </div>
+            </div>
+        </div>
+
+        <div id="permissionNotice" class="notice">
+
+            <h3 id="noticeTitle">Clipboard erişimi gerekli</h3>
+
+            <p id="noticeText">
+                Modrinth bağlantılarını otomatik algılamak için clipboard
+                erişimini başlatmalısın.
+            </p>
+
+            <button id="permissionButton">
+                Clipboard erişimini başlat
+            </button>
+
+        </div>
+
+        <div id="currentUrl" class="url-display hidden"></div>
+
+    </div>
+
+    <div class="panel">
+
+        <div class="results-header">
+            <h2>Uyumluluk sonuçları</h2>
+            <span id="scanStatus" class="small">Henüz tarama yapılmadı</span>
+        </div>
+
+        <div id="results" class="results">
+            <div class="history-empty">
+                Modrinth mod bağlantısını kopyaladığında sonuçlar burada gösterilecek.
+            </div>
+        </div>
+
+    </div>
+
+    <div class="footer">
+        Modrinth API · Automatic Clipboard Checker
+    </div>
+
+</div>
+
+<script>
+const statusDot = document.getElementById("statusDot");
+const statusTitle = document.getElementById("statusTitle");
+const statusDescription = document.getElementById("statusDescription");
+
+const permissionNotice = document.getElementById("permissionNotice");
+const noticeTitle = document.getElementById("noticeTitle");
+const noticeText = document.getElementById("noticeText");
+const permissionButton = document.getElementById("permissionButton");
+
+const currentUrl = document.getElementById("currentUrl");
+const results = document.getElementById("results");
+const scanStatus = document.getElementById("scanStatus");
+
+let clipboardMonitoring = false;
+let clipboardTimer = null;
+let lastClipboardText = "";
+let lastScannedUrl = "";
+let scanInProgress = false;
+
+const targets = [
+    {
+        title: "Minecraft 26.3 · Fabric",
+        gameVersion: "26.3",
+        loader: "fabric"
+    },
+    {
+        title: "Minecraft 26.3 · NeoForge",
+        gameVersion: "26.3",
+        loader: "neoforge"
+    },
+    {
+        title: "Minecraft 1.21.11 · Fabric",
+        gameVersion: "1.21.11",
+        loader: "fabric"
+    },
+    {
+        title: "Minecraft 1.21.1 · Fabric",
+        gameVersion: "1.21.1",
+        loader: "fabric"
+    },
+    {
+        title: "Minecraft 1.21.1 · NeoForge",
+        gameVersion: "1.21.1",
+        loader: "neoforge"
+    },
+    {
+        title: "Minecraft 1.20.1 · Forge",
+        gameVersion: "1.20.1",
+        loader: "forge"
+    }
+];
+
+function setStatus(type, title, description) {
+    statusDot.className = "status-dot";
+
+    if (type === "active") {
+        statusDot.classList.add("active");
+    }
+
+    if (type === "error") {
+        statusDot.classList.add("error");
+    }
+
+    statusTitle.textContent = title;
+    statusDescription.textContent = description;
+}
+
+function showPermissionNotice(title, message, buttonText) {
+    permissionNotice.classList.remove("hidden");
+
+    noticeTitle.textContent = title;
+    noticeText.textContent = message;
+    permissionButton.textContent = buttonText;
+}
+
+function hidePermissionNotice() {
+    permissionNotice.classList.add("hidden");
+}
+
+function getModrinthSlug(url) {
+    try {
+        const parsed = new URL(url);
+
+        if (
+            parsed.hostname !== "modrinth.com" &&
+            parsed.hostname !== "www.modrinth.com"
+        ) {
+            return null;
+        }
+
+        const parts = parsed.pathname.split("/").filter(Boolean);
+
+        if (parts.length < 2) {
+            return null;
+        }
+
+        const allowedTypes = [
+            "mod",
+            "plugin",
+            "resourcepack",
+            "shader",
+            "datapack"
+        ];
+
+        if (!allowedTypes.includes(parts[0])) {
+            return null;
+        }
+
+        return parts[1];
+    } catch {
+        return null;
+    }
+}
+
+async function checkCompatibility(slug, target) {
+    const loaders = JSON.stringify([target.loader]);
+    const gameVersions = JSON.stringify([target.gameVersion]);
+
+    const apiUrl =
+        "https://api.modrinth.com/v2/project/" +
+        encodeURIComponent(slug) +
+        "/version?loaders=" +
+        encodeURIComponent(loaders) +
+        "&game_versions=" +
+        encodeURIComponent(gameVersions);
+
+    try {
+        const response = await fetch(apiUrl);
+
+        if (!response.ok) {
+            return {
+                status: "unknown",
+                message: "API yanıtı alınamadı"
+            };
+        }
+
+        const versions = await response.json();
+
+        if (Array.isArray(versions) && versions.length > 0) {
+            return {
+                status: "supported",
+                message: "Destekleniyor"
+            };
+        }
+
+        return {
+            status: "unsupported",
+            message: "Desteklenmiyor"
+        };
+
+    } catch (error) {
+        return {
+            status: "unknown",
+            message: "Bağlantı hatası"
+        };
+    }
+}
+
+function createResultCard(target, result) {
+    const card = document.createElement("div");
+    card.className = "result-card";
+
+    const title = document.createElement("h3");
+    title.textContent = target.title;
+
+    const label = document.createElement("div");
+    label.className = "result-label";
+
+    if (result.status === "supported") {
+        label.classList.add("supported");
+        label.textContent = "✓ " + result.message;
+    } else if (result.status === "unsupported") {
+        label.classList.add("unsupported");
+        label.textContent = "✕ " + result.message;
+    } else {
+        label.classList.add("unknown");
+        label.textContent = "? " + result.message;
+    }
+
+    card.appendChild(title);
+    card.appendChild(label);
+
+    return card;
+}
+
+async function scanModrinth(url) {
+    const slug = getModrinthSlug(url);
+
+    if (!slug) {
+        return;
+    }
+
+    if (scanInProgress) {
+        return;
+    }
+
+    if (url === lastScannedUrl) {
+        return;
+    }
+
+    scanInProgress = true;
+    lastScannedUrl = url;
+
+    currentUrl.textContent = url;
+    currentUrl.classList.remove("hidden");
+
+    scanStatus.innerHTML = '<span class="loader"></span>Mod kontrol ediliyor';
+
+    results.innerHTML = "";
+
+    const loadingCard = document.createElement("div");
+    loadingCard.className = "history-empty";
+    loadingCard.textContent = "Mod sürümleri kontrol ediliyor...";
+    results.appendChild(loadingCard);
+
+    try {
+        const projectResponse = await fetch(
+            "https://api.modrinth.com/v2/project/" +
+            encodeURIComponent(slug)
+        );
+
+        if (!projectResponse.ok) {
+            throw new Error("Mod bulunamadı");
+        }
+
+        const project = await projectResponse.json();
+
+        const projectName = project.title || slug;
+
+        scanStatus.textContent = projectName + " taranıyor";
+
+        const checks = await Promise.all(
+            targets.map(target => checkCompatibility(slug, target))
+        );
+
+        results.innerHTML = "";
+
+        targets.forEach((target, index) => {
+            results.appendChild(
+                createResultCard(target, checks[index])
+            );
+        });
+
+        scanStatus.textContent = "Kontrol tamamlandı";
+
+    } catch (error) {
+        results.innerHTML = "";
+
+        const errorCard = document.createElement("div");
+        errorCard.className = "history-empty";
+        errorCard.textContent =
+            "Mod bilgisi alınamadı. Modrinth bağlantısını kontrol et.";
+
+        results.appendChild(errorCard);
+
+        scanStatus.textContent = "Kontrol başarısız";
+
+    } finally {
+        scanInProgress = false;
+    }
+}
+
+async function readClipboard() {
+    if (!navigator.clipboard || !navigator.clipboard.readText) {
+        throw new Error("Clipboard API desteklenmiyor.");
+    }
+
+    return await navigator.clipboard.readText();
+}
+
+async function monitorClipboard() {
+    if (!clipboardMonitoring) {
+        return;
+    }
+
+    try {
+        const text = await readClipboard();
+
+        if (!text || text === lastClipboardText) {
+            return;
+        }
+
+        lastClipboardText = text;
+
+        const slug = getModrinthSlug(text.trim());
+
+        if (slug) {
+            scanModrinth(text.trim());
+        }
+
+    } catch (error) {
+        stopClipboardMonitoring();
+
+        setStatus(
+            "error",
+            "Clipboard erişimi durdu",
+            "Tarayıcı clipboard okumasına izin vermedi."
+        );
+
+        showPermissionNotice(
+            "Clipboard erişimi gerekli",
+            "Clipboard erişimi başarısız oldu. Tarayıcı izinlerini kontrol edip tekrar başlat.",
+            "Tekrar dene"
+        );
+    }
+}
+
+function startClipboardMonitoring() {
+    if (clipboardMonitoring) {
+        return;
+    }
+
+    clipboardMonitoring = true;
+
+    setStatus(
+        "active",
+        "Clipboard izleniyor",
+        "Modrinth bağlantısı kopyalandığında otomatik tarama yapılacak."
+    );
+
+    hidePermissionNotice();
+
+    clipboardTimer = setInterval(
+        monitorClipboard,
+        1200
+    );
+
+    monitorClipboard();
+}
+
+function stopClipboardMonitoring() {
+    clipboardMonitoring = false;
+
+    if (clipboardTimer) {
+        clearInterval(clipboardTimer);
+        clipboardTimer = null;
+    }
+}
+
+permissionButton.addEventListener("click", async () => {
+    permissionButton.disabled = true;
+
+    setStatus(
+        "",
+        "Clipboard erişimi test ediliyor",
+        "Tarayıcı erişimi kontrol ediyor..."
+    );
+
+    try {
+        const text = await readClipboard();
+
+        lastClipboardText = text || "";
+
+        setStatus(
+            "active",
+            "Clipboard erişimi doğrulandı",
+            "Clipboard okunabildi. Otomatik izleme başlatılıyor."
+        );
+
+        startClipboardMonitoring();
+
+        if (text) {
+            const slug = getModrinthSlug(text.trim());
+
+            if (slug) {
+                scanModrinth(text.trim());
+            }
+        }
+
+    } catch (error) {
+        setStatus(
+            "error",
+            "Clipboard erişimi başarısız",
+            "Tarayıcı clipboard okumasına izin vermedi."
+        );
+
+        showPermissionNotice(
+            "Clipboard erişimi sağlanamadı",
+            "Chrome bu HTML dosyasının clipboard erişimini engelliyor olabilir. Dosya üzerinden açıldığında sürekli clipboard izleme desteklenmeyebilir.",
+            "Tekrar dene"
+        );
+
+    } finally {
+        permissionButton.disabled = false;
+    }
+});
+
+setStatus(
+    "",
+    "Clipboard erişimi bekleniyor",
+    "Otomatik mod taramasını başlatmak için clipboard erişimini etkinleştir."
+);
+</script>
+
+</body>
+</html>
